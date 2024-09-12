@@ -70,7 +70,7 @@ class Enlace(object):
             for pacote in pacotes:
                 self._send(pacote)
         else:
-            self.requests_to_send[save_name] = pacotes
+            self.requests_to_send[request_name] = pacotes
             request = self.codec.empacotar(0, 'file', request_name)
             self._send(request)
     def receiveObject(self, accept_name):
@@ -111,17 +111,18 @@ class Enlace(object):
             self._log(self.codec.desempacotar(pacote))
     def receber(self, timeout=1):
         start = time.time()
+        data = b""
         while (time.time() - start < timeout or timeout == 0):
-            self.buffer += self.port.read(1)
-            inicio = self.buffer.find(b'#StR#')
+            data += self.port.read(1)
+            inicio = data.find(self.codec.start_sequence)
             if inicio != -1: 
-                fim = self.buffer.find(b'#eNd#', inicio)
+                fim = data.find(self.codec.end_sequence, inicio)
                 if fim == -1:
                     # If no valid #eNd# marker is found yet, continue reading
                     continue
-                fim = fim + 5  # Include '#eNd#'
-                pacote = self.buffer[inicio:fim]  # +3 to include '#eNd#'/'#eNd#')
-                self.buffer = self.buffer[:inicio] + self.buffer[fim:]
+                fim = fim + self.codec.extremes_size 
+                pacote = data[inicio:fim] 
+                data = data[:inicio] + data[fim:]
                 
                 pacote = self.codec.desempacotar(pacote)
                 return pacote
@@ -139,7 +140,6 @@ class Enlace(object):
                 if fim == -1:
                     # If no valid #eNd# marker is found yet, continue reading
                     continue
-
                 # recebeu um pacote
                     
                 fim = fim + self.codec.extremes_size
@@ -161,6 +161,7 @@ class Enlace(object):
                 return pacote
         
     def _accepted_goSend(self, accept_name):
+        print(f"Enviando pacotes para {accept_name}")
         pacotes = self.requests_to_send[accept_name]
         total_de_pacotes = len(pacotes)
         ultimo_recebido = -1

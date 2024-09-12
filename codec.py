@@ -11,7 +11,7 @@ class Codec:
         self.start_sequence = b'#StR#' or kwargs.get('start_sequence')
         self.end_sequence = b'#eNd#' or kwargs.get('end_sequence')
         self.extremes_size = len(self.start_sequence)
-        self.header_size = self.payload_size_length + self.info_size + self.crc_lenght + 2
+        self.header_size = self.payload_size_length + self.info_size + self.crc_lenght + 4
         self.header_slice = slice(self.extremes_size, self.extremes_size+self.header_size)
 
         if type(self.crc_lenght) != int:
@@ -80,7 +80,7 @@ class Codec:
         if type(info) == int:
             types += 3
             try:
-                info = info.to_bytes(self.info_size, byteorder='big')
+                info = info.to_bytes(self.info_size, byteorder='big', signed=True)
             except:
                 raise Exception(f"Info muito grande, máximo {self.info_size} bytes")
         elif type(info) == str:
@@ -127,6 +127,7 @@ class Codec:
         return (sop+header+payload+eop)
 
     def desempacotar(self, pacote):
+        print(pacote)
         if pacote[:self.extremes_size] != self.start_sequence:
             raise Exception("Pacote não contem sequência de início")
         if pacote[-self.extremes_size:] != self.end_sequence:
@@ -147,7 +148,7 @@ class Codec:
         tamanho_payload = int.from_bytes(header[4+self.crc_lenght:4+self.crc_lenght+self.payload_size_length], byteorder='big')
         info = header[4+self.crc_lenght+self.payload_size_length:]
         payload = pacote[self.header_size+self.extremes_size:-self.extremes_size]
-
+        print(payload)
         
 
         crc_calculado = self.crc16(payload)
@@ -155,8 +156,8 @@ class Codec:
         if tipo_dados <=2: # info é string
             info = info.decode('utf-8').strip('+')
         else: # info é int
-            info = int.from_bytes(info, byteorder='big')
-
+            info = int.from_bytes(info, byteorder='big', signed=True)
+        print(tipo_dados)
         if tipo == 2: # payload é objeto
             payload = pickle.loads(payload)
         elif tipo_dados == 0 or tipo_dados == 3: # payload é string
@@ -175,3 +176,4 @@ class Codec:
                         'total_size': len(pacote),
                         'packet_id': packet_id}
         return decodificado
+    
