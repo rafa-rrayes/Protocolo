@@ -48,6 +48,7 @@ class Enlace(object):
                                   serial.PARITY_NONE,
                                   serial.STOPBITS_ONE,
                                   0.1)
+        
         self._activate()
     
     def sendData(self, request_name, data):
@@ -87,6 +88,9 @@ class Enlace(object):
     def _acceptObject(self, accept_name):
         self._send(self.codec.empacotar(1, 'object', accept_name))
         pacote = self.receive_packet(0)
+        if pacote['tipo'] == 2 :
+            confirmation = self.codec.empacotar(5, 0)
+            self._send(confirmation)
         return pacote['payload']
     def _acceptFile(self, accept_name):
 
@@ -130,6 +134,7 @@ class Enlace(object):
         if self.keep_log:
             self._log(self.codec.desempacotar(pacote))
     def receive_packet(self, timeout=1):
+        self.pauseRead()
         start = time.time()
         data = b""
         while (time.time() - start < timeout or timeout == 0):
@@ -140,19 +145,26 @@ class Enlace(object):
                 if fim == -1:
                     # If no valid #eNd# marker is found yet, continue reading
                     continue
+                self.resumeRead()
                 fim = fim + self.codec.extremes_size 
                 pacote = data[inicio:fim] 
                 data = data[:inicio] + data[fim:]
                 
                 pacote = self.codec.desempacotar(pacote)
+                print(pacote)
                 return pacote
+        self.resumeRead()
         raise Timeout
     def _activate(self):
         import threading
+        self.reading = True
         self.threadRead = threading.Thread(target=self._keep_reading)
         self.threadRead.start()
     def _keep_reading(self):
         while True:
+            if not self.reading:
+                time.sleep(0.1)
+                continue
             self.buffer += self.port.read(1)
             inicio = self.buffer.find(self.codec.start_sequence)
             if inicio != -1: 
@@ -213,7 +225,10 @@ class Enlace(object):
                 break
         self.requests_to_send.pop(accept_name)
                 
-        
+    def pauseRead(self):
+        self.reading = False
+    def resumeRead(self):
+        self.reading = True
     def close(self):
         self.port.close()
         self.threadRead.join()
