@@ -75,27 +75,27 @@ class Enlace(object):
             self.requests_to_send[request_name] = pacotes
             request = self.codec.empacotar(0, 'file', request_name+'///'+save_name+'///'+str(len(pacotes)))
             self._send(request)
-    def receive(self, accept_name):
+    def accept(self, accept_name):
         if not accept_name in self.requests_to_accept:
             raise Exception(f"No request to accept with name {accept_name}")
-        if self.requests_to_accept[accept_name]['tipo'] == 'object':
-            return self._receiveObject(accept_name)
-        elif self.requests_to_accept[accept_name]['tipo'] == 'file':
-            return self._receiveFile(accept_name)
+        if self.requests_to_accept[accept_name]['type'] == 'object':
+            return self._acceptObject(accept_name)
+        elif self.requests_to_accept[accept_name]['type'] == 'file':
+            return self._acceptFile(accept_name)
         
 
-    def _receiveObject(self, accept_name):
+    def _acceptObject(self, accept_name):
         self._send(self.codec.empacotar(1, 'object', accept_name))
-        pacote = self.receber(0)
+        pacote = self.receive_packet(0)
         return pacote['payload']
-    def _receiveFile(self, accept_name):
+    def _acceptFile(self, accept_name):
 
         self._send(self.codec.empacotar(1, 'file', accept_name))
         data = b""
         ultimo_recebido = -1
         while True:
             try:
-                pacote = self.receber(1)
+                pacote = self.receive_packet(1)
             except Timeout:
                 
                 self._send(self.codec.empacotar(7, ultimo_recebido))
@@ -129,7 +129,7 @@ class Enlace(object):
         self.port.write(pacote)
         if self.keep_log:
             self._log(self.codec.desempacotar(pacote))
-    def receber(self, timeout=1):
+    def receive_packet(self, timeout=1):
         start = time.time()
         data = b""
         while (time.time() - start < timeout or timeout == 0):
@@ -161,7 +161,7 @@ class Enlace(object):
                     # If no valid #eNd# marker is found yet, continue reading
                     continue
                 # recebeu um pacote
-                    
+                print("Recebeu pacote")
                 fim = fim + self.codec.extremes_size
                 pacote = self.buffer[inicio:fim] 
                 self.buffer = self.buffer[:inicio] + self.buffer[fim:]
@@ -173,16 +173,22 @@ class Enlace(object):
                 #     raise InvalidCRC(pacote['crc_recebido'], pacote['crc_calculado'])
 
                 if pacote['tipo'] == 0:
-                    tipo = pacote['info']
+                    request_type = pacote['info']
                     name, tipo, size = pacote['payload'].split('///')
-                    if tipo == 'object':
-                        self.requests_to_accept[name] = {'tipo': tipo, 'payloadSize': size}
-                    elif tipo == 'file':
-                        self.requests_to_accept[name] = {'tipo': tipo, 'n packets': size}
+                    if request_type == 'object':
+                        self.requests_to_accept[name] = {'type': 'object',
+                                                         'as': tipo,
+                                                        'payloadSize': size}
+                    elif request_type == 'file':
+                        self.requests_to_accept[name] = {'type': 'file',
+                                                         'as': tipo,
+                                                        'n packets': size}
+                    else:
+                        raise Exception(f"Tipo de dado não reconhecido: {tipo}")
                 elif pacote['tipo'] == 1:
                     self._accepted_goSend(pacote['payload'])
                 
-                return pacote
+                self.received.append(pacote)
         
     def _accepted_goSend(self, accept_name):
         pacotes = self.requests_to_send[accept_name]
@@ -193,7 +199,7 @@ class Enlace(object):
             self._send(pacote)
             if self.await_confirmation:
                 try:
-                    confirmacao = self.receber(2)
+                    confirmacao = self.receive_packet(2)
                 except Timeout:
                     self._send(self.codec.empacotar(7, ultimo_recebido))
                     continue
