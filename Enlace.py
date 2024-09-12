@@ -41,6 +41,8 @@ class Enlace(object):
         self.buffer    = b""
 
         self.codec = Codec()
+
+        self.accepted = {}
     def open(self):
         self.port = serial.Serial(self.name,
                                   115200,
@@ -86,12 +88,14 @@ class Enlace(object):
         
 
     def _acceptObject(self, accept_name):
+        self.accepted[accept_name] = None
         self._send(self.codec.empacotar(1, 'object', accept_name))
-        pacote = self.receive_packet(0)
-        if pacote['tipo'] == 2 :
-            confirmation = self.codec.empacotar(5, 0)
-            self._send(confirmation)
-        return pacote['payload']
+        while self.accepted[accept_name] == None:
+            continue
+        objeto = self.accepted[accept_name]
+        self.accepted.pop(accept_name)
+        self._send(self.codec.empacotar(5, 0))  
+        return objeto
     def _acceptFile(self, accept_name):
 
         self._send(self.codec.empacotar(1, 'file', accept_name))
@@ -149,9 +153,7 @@ class Enlace(object):
                 fim = fim + self.codec.extremes_size 
                 pacote = data[inicio:fim] 
                 data = data[:inicio] + data[fim:]
-                
                 pacote = self.codec.desempacotar(pacote)
-                print(pacote)
                 return pacote
         self.resumeRead()
         raise Timeout
@@ -199,8 +201,12 @@ class Enlace(object):
                         raise Exception(f"Tipo de dado não reconhecido: {tipo}")
                 elif pacote['tipo'] == 1:
                     self._accepted_goSend(pacote['payload'])
-                
+                elif pacote['tipo'] == 2:
+                    if pacote['info'] in self.accepted:
+                        self.accepted[pacote['info']] = pacote['payload']
+        
                 self.received.append(pacote)
+
         
     def _accepted_goSend(self, accept_name):
         pacotes = self.requests_to_send[accept_name]
