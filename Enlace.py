@@ -59,7 +59,7 @@ class Enlace(object):
             self._send(pacote)
         else:
             self.requests_to_send[request_name] = [pacote]
-            request = self.codec.empacotar(0, '', request_name)
+            request = self.codec.empacotar(0, 'object', request_name)
             self._send(request)
     def sendFile(self, request_name, file_path, save_name=None, data=None):
         if not data:
@@ -75,9 +75,20 @@ class Enlace(object):
             self.requests_to_send[request_name] = pacotes
             request = self.codec.empacotar(0, 'file', request_name)
             self._send(request)
-    def receiveObject(self, accept_name):
+    def receive(self, accept_name):
+        if not accept_name in self.requests_to_accept:
+            raise Exception(f"No request to accept with name {accept_name}")
+        if self.requests_to_accept[accept_name]['tipo'] == 'object':
+            return self._receiveObject(accept_name)
+        elif self.requests_to_accept[accept_name]['tipo'] == 'file':
+            return self._receiveFile(accept_name)
+        
+
+    def _receiveObject(self, accept_name):
         self._send(self.codec.empacotar(1, 'object', accept_name))
-    def receiveFile(self, accept_name):
+        pacote = self.receber(0)
+        return pacote['payload']
+    def _receiveFile(self, accept_name):
 
         self._send(self.codec.empacotar(1, 'file', accept_name))
         data = b""
@@ -170,17 +181,18 @@ class Enlace(object):
                 return pacote
         
     def _accepted_goSend(self, accept_name):
-        print(f"Enviando pacotes para {accept_name}")
         pacotes = self.requests_to_send[accept_name]
         total_de_pacotes = len(pacotes)
         ultimo_recebido = -1
         while True:
             pacote = pacotes[ultimo_recebido+1]
             self._send(pacote)
-            print(f"Enviando pacote {ultimo_recebido+1}")
             if self.await_confirmation:
-                confirmacao = self.receber()
-                print(confirmacao)
+                try:
+                    confirmacao = self.receber(2)
+                except Timeout:
+                    self._send(self.codec.empacotar(7, ultimo_recebido))
+                    continue
                 if confirmacao['tipo'] == 5:
                     ultimo_recebido = confirmacao['info']
                 if confirmacao['tipo'] == 7:
