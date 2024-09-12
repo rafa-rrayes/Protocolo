@@ -48,6 +48,8 @@ class Enlace(object):
                                   serial.PARITY_NONE,
                                   serial.STOPBITS_ONE,
                                   0.1)
+        self._activate()
+    
     def sendData(self, request_name, data):
         try:
             pacote = self.codec.empacotar(2, request_name, data)
@@ -88,19 +90,26 @@ class Enlace(object):
                 self._send(self.codec.empacotar(7, ultimo_recebido))
                 continue
             if pacote['tipo'] == 6:
+                save_name = pacote['payload']
                 break
             elif pacote['tipo'] == 3:
+                print(f"Recebendo inicio")
                 total_de_pacotes = pacote['info']
-                self._send(self.codec.empacotar(5, -1))
-                ultimo_recebido = -1
+                self._send(self.codec.empacotar(5, 0))
+                ultimo_recebido = 0
             elif pacote['tipo'] == 4:
+                print(f"Recebendo pacote {pacote['info']}")
                 if pacote['info'] == ultimo_recebido+1:
                     data += pacote['payload']
                     ultimo_recebido = pacote['info']
+                    print(f"Recebido pacote {ultimo_recebido}")
                     self._send(self.codec.empacotar(5, ultimo_recebido))
                 else:
                     self._send(self.codec.empacotar(7, ultimo_recebido))
-            self.received.append(pacote)
+            elif pacote['tipo'] == 7:
+                self._send(self.codec.empacotar(5, ultimo_recebido))
+        with open(save_name, 'wb') as f:
+            f.write(data)
         
     
         
@@ -127,10 +136,10 @@ class Enlace(object):
                 pacote = self.codec.desempacotar(pacote)
                 return pacote
         raise Timeout
-    def activate(self):
+    def _activate(self):
         import threading
-        threadRead = threading.Thread(target=self._keep_reading)
-        threadRead.start()
+        self.threadRead = threading.Thread(target=self._keep_reading)
+        self.threadRead.start()
     def _keep_reading(self):
         while True:
             self.buffer += self.port.read(1)
@@ -185,6 +194,7 @@ class Enlace(object):
         
     def close(self):
         self.port.close()
+        self.threadRead.join()
     def clear_buffer(self):
         self.buffer = b""
     def _log(self, pacote, recebido=False):
