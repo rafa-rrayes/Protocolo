@@ -79,7 +79,7 @@ class Enlace(object):
 
         self._send(self.codec.empacotar(1, 'file', accept_name))
         data = b""
-        ultimo_recebido = 'inicio'
+        ultimo_recebido = -1
         while True:
             try:
                 pacote = self.receber(1)
@@ -91,7 +91,7 @@ class Enlace(object):
                 break
             elif pacote['tipo'] == 3:
                 total_de_pacotes = pacote['info']
-                self._send(self.codec.empacotar(5, 'inicio'))
+                self._send(self.codec.empacotar(5, -1))
                 ultimo_recebido = -1
             elif pacote['tipo'] == 4:
                 if pacote['info'] == ultimo_recebido+1:
@@ -167,19 +167,17 @@ class Enlace(object):
         ultimo_recebido = -1
         while True:
             pacote = pacotes[ultimo_recebido+1]
-
             self._send(pacote)
             print(f"Enviando pacote {ultimo_recebido+1}")
             if self.await_confirmation:
                 confirmacao = self.receber()
-                if confirmacao['tipo'] != 5:
-                    raise Exception(f"Erro ao enviar pacote {ultimo_recebido+1}")
-                else:
+                print(confirmacao)
+                if confirmacao['tipo'] == 5:
                     ultimo_recebido = confirmacao['info']
-                    if ultimo_recebido == 'inicio':
-                        ultimo_recebido = 0
                 if confirmacao['tipo'] == 7:
                     ultimo_recebido = confirmacao['info']
+            else:
+                ultimo_recebido += 1
             if ultimo_recebido == total_de_pacotes-1:
                 break
         self.requests_to_send.pop(accept_name)

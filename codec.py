@@ -127,7 +127,6 @@ class Codec:
         return (sop+header+payload+eop)
 
     def desempacotar(self, pacote):
-        print(pacote)
         if pacote[:self.extremes_size] != self.start_sequence:
             raise Exception("Pacote não contem sequência de início")
         if pacote[-self.extremes_size:] != self.end_sequence:
@@ -148,7 +147,6 @@ class Codec:
         tamanho_payload = int.from_bytes(header[4+self.crc_lenght:4+self.crc_lenght+self.payload_size_length], byteorder='big')
         info = header[4+self.crc_lenght+self.payload_size_length:]
         payload = pacote[self.header_size+self.extremes_size:-self.extremes_size]
-        print(payload)
         
 
         crc_calculado = self.crc16(payload)
@@ -157,7 +155,6 @@ class Codec:
             info = info.decode('utf-8').strip('+')
         else: # info é int
             info = int.from_bytes(info, byteorder='big', signed=True)
-        print(tipo_dados)
         if tipo == 2: # payload é objeto
             payload = pickle.loads(payload)
         elif tipo_dados == 0 or tipo_dados == 3: # payload é string
