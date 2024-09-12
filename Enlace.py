@@ -33,7 +33,7 @@ class Enlace(object):
         self.await_confirmation =kwargs.get('await_confirmation', True)
         self.send_confirmation =kwargs.get('send_confirmation', True)
         self.keep_log = kwargs.get('keep_log', True)
-        self.requests_to_accept = []
+        self.requests_to_accept = {}
         self.requests_to_send = {}
 
         self.received = []
@@ -59,7 +59,7 @@ class Enlace(object):
             self._send(pacote)
         else:
             self.requests_to_send[request_name] = [pacote]
-            request = self.codec.empacotar(0, 'object', request_name)
+            request = self.codec.empacotar(0, 'object', request_name+'///'+str(type(data))+'///'+str(len(pacote)))
             self._send(request)
     def sendFile(self, request_name, file_path, save_name=None, data=None):
         if not data:
@@ -73,7 +73,7 @@ class Enlace(object):
                 self._send(pacote)
         else:
             self.requests_to_send[request_name] = pacotes
-            request = self.codec.empacotar(0, 'file', request_name)
+            request = self.codec.empacotar(0, 'file', request_name+'///'+save_name+'///'+str(len(pacotes)))
             self._send(request)
     def receive(self, accept_name):
         if not accept_name in self.requests_to_accept:
@@ -173,8 +173,12 @@ class Enlace(object):
                 #     raise InvalidCRC(pacote['crc_recebido'], pacote['crc_calculado'])
 
                 if pacote['tipo'] == 0:
-                    self.requests_to_accept.append({'nome':pacote['payload'],
-                                                    'tipo': pacote['info']})
+                    tipo = pacote['info']
+                    name, tipo, size = pacote['payload'].split('///')
+                    if tipo == 'object':
+                        self.requests_to_accept[name] = {'tipo': tipo, 'payloadSize': size}
+                    elif tipo == 'file':
+                        self.requests_to_accept[name] = {'tipo': tipo, 'n packets': size}
                 elif pacote['tipo'] == 1:
                     self._accepted_goSend(pacote['payload'])
                 
