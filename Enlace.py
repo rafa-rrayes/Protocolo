@@ -30,8 +30,8 @@ class Enlace(object):
         self.packet_size = packet_size
         self.accept_all_files = kwargs.get('accept_all_files', False)
         self.accept_all_objects = kwargs.get('accept_all_objects', True)
-        self.await_confirmation_objects =kwargs.get('await_confirmation_objects', True)
-        self.await_confirmation_files =kwargs.get('await_confirmation_files', True)
+        self.await_acception_objects =kwargs.get('await_acception_objects', True)
+        self.await_acception_files =kwargs.get('await_acception_files', True)
         self.send_confirmation =kwargs.get('send_confirmation', True)
         self.keep_log = kwargs.get('keep_log', True)
         self.requests_to_accept = {}
@@ -64,7 +64,7 @@ class Enlace(object):
             pacote = self.codec.empacotar(2, request_name, data)
         except Exception as e:
             raise e
-        if not self.await_confirmation_objects:
+        if not self.await_acception_objects:
             self._send(pacote)
         else:
             self.requests_to_send[request_name] = [pacote]
@@ -78,7 +78,7 @@ class Enlace(object):
             save_name = file_path.split('/')[-1]
         pacotes = splice_file(self.codec, data, save_name)
         self.requests_to_send[request_name] = pacotes
-        if not self.await_confirmation_files:
+        if not self.await_acception_files:
             self._accepted_goSend(request_name)
         else:
             request = self.codec.empacotar(0, 'file', request_name+'///'+save_name+'///'+str(len(pacotes)))
