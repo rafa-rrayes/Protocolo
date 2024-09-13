@@ -37,13 +37,26 @@ class Enlace(object):
         self.requests_to_accept = {}
         self.requests_to_send = {}
 
-        self.objects_received = []
+        self.objects_received = {}
 
         self.buffer    = b""
 
         self.codec = Codec()
 
         self.accepted = {}
+    def connect(self, timeout=1):
+        if 'connect' in self.objects_received:
+            self.send_object('accept', 'connect')
+            return True
+        else:
+            self.send_object('start?', 'connect')
+            try:
+                confirmation = self.receive_packet(timeout)
+            except Timeout:
+                return False
+            if confirmation['tipo'] == 2 and confirmation['info'] == 'connect' and confirmation['payload'] == 'accept':
+                return True
+        return False
     def open(self):
         self.port = serial.Serial(self.name,
                                   115200,
@@ -65,7 +78,6 @@ class Enlace(object):
                 pacote = self.codec.empacotar(2, request_name, data)
             except Exception as e:
                 raise e
-            print('enviou')
             self._send(pacote)
             return
         else:  
@@ -243,8 +255,7 @@ class Enlace(object):
                     self._accepted_goSend(pacote['payload'])
                 elif pacote['tipo'] == 2:
                     if self.accept_all_objects:
-                        print(1)
-                        self.objects_received.append(pacote['payload'])
+                        self.objects_received[pacote['info']] = pacote['payload']
                     if pacote['info'] in self.accepted:
                         self.accepted[pacote['info']] = pacote['payload']
         return
@@ -261,9 +272,8 @@ class Enlace(object):
     def clear_buffer(self):
         self.buffer = b""
     def get_objects(self):
-        objects = self.objects_received[:]
-        self.objects_received = []
-
+        objects = self.objects_received
+        self.objects_received = {}
         return objects
     def _log(self, pacote, recebido=False):
         hora = datetime.now()
