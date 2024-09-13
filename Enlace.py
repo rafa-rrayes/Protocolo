@@ -29,14 +29,15 @@ class Enlace(object):
         self.name        = name
         self.packet_size = packet_size
         self.accept_all_files = kwargs.get('accept_all_files', False)
-        self.receive_all_data = kwargs.get('receive_all_data', True)
-        self.await_confirmation =kwargs.get('await_confirmation', True)
+        self.accept_all_objects = kwargs.get('accept_all_objects', True)
+        self.await_confirmation_objects =kwargs.get('await_confirmation_objects', True)
+        self.await_confirmation_files =kwargs.get('await_confirmation_files', True)
         self.send_confirmation =kwargs.get('send_confirmation', True)
         self.keep_log = kwargs.get('keep_log', True)
         self.requests_to_accept = {}
         self.requests_to_send = {}
 
-        self.received = []
+        self.objects_received = []
 
         self.buffer    = b""
 
@@ -63,7 +64,7 @@ class Enlace(object):
             pacote = self.codec.empacotar(2, request_name, data)
         except Exception as e:
             raise e
-        if not self.await_confirmation:
+        if not self.await_confirmation_objects:
             self._send(pacote)
         else:
             self.requests_to_send[request_name] = [pacote]
@@ -76,11 +77,10 @@ class Enlace(object):
         if not save_name:
             save_name = file_path.split('/')[-1]
         pacotes = splice_file(self.codec, data, save_name)
-        if not self.await_confirmation:
-            for pacote in pacotes:
-                self._send(pacote)
+        self.requests_to_send[request_name] = pacotes
+        if not self.await_confirmation_files:
+            self._accepted_goSend(request_name)
         else:
-            self.requests_to_send[request_name] = pacotes
             request = self.codec.empacotar(0, 'file', request_name+'///'+save_name+'///'+str(len(pacotes)))
             self._send(request)
 
@@ -93,7 +93,8 @@ class Enlace(object):
         elif self.requests_to_accept[accept_name]['type'] == 'file':
             return self._receive_file(accept_name)
         
-
+    def _error_during_receive(self, next_packet):
+        self._send(self.codec.empacotar(7, next_packet))
     def _receive_object(self, accept_name):
         self.accepted[accept_name] = None
         self._send(self.codec.empacotar(1, 'object', accept_name))
@@ -103,8 +104,7 @@ class Enlace(object):
         self.accepted.pop(accept_name)
         self._send(self.codec.empacotar(5, 0))  
         return objeto
-    def _error_during_receive(self, next_packet):
-        self._send(self.codec.empacotar(7, next_packet))
+    
     def _receive_file(self, accept_name): # recebe um arquivo
         self.pauseRead()
         self._send(self.codec.empacotar(1, 'file', accept_name))
@@ -143,7 +143,27 @@ class Enlace(object):
         with open(save_name, 'wb') as f:
             f.write(data)
         self.resumeRead()
-    
+    def _accepted_goSend(self, accept_name):  # envia um objeto ou arquivo aceito
+        pacotes = self.requests_to_send[accept_name]
+        total_de_pacotes = len(pacotes)
+        ultimo_recebido = -1
+        while True:
+            pacote = pacotes[ultimo_recebido+1]
+            self._send(pacote)
+            try:
+                confirmacao = self.receive_packet(1)
+            except Timeout:
+                self._send(self.codec.empacotar(7, ultimo_recebido))
+                continue
+
+            # atualiza o ultimo pacote recebido
+            if confirmacao['tipo'] == 5 or confirmacao['tipo'] == 7:
+                ultimo_recebido = confirmacao['info']
+
+            if ultimo_recebido == total_de_pacotes-1:
+                break
+
+        self.requests_to_send.pop(accept_name)
         
     
     def receive_packet(self, timeout=1):
@@ -213,33 +233,15 @@ class Enlace(object):
                 elif pacote['tipo'] == 1:
                     self._accepted_goSend(pacote['payload'])
                 elif pacote['tipo'] == 2:
+                    if self.accept_all_objects:
+                        self.objects_received[pacote['info']] = pacote['payload']
                     if pacote['info'] in self.accepted:
                         self.accepted[pacote['info']] = pacote['payload']
         
                 self.received.append(pacote)
 
         
-    def _accepted_goSend(self, accept_name):  # envia um objeto ou arquivo aceito
-        pacotes = self.requests_to_send[accept_name]
-        total_de_pacotes = len(pacotes)
-        ultimo_recebido = -1
-        while True:
-            pacote = pacotes[ultimo_recebido+1]
-            self._send(pacote)
-            try:
-                confirmacao = self.receive_packet(1)
-            except Timeout:
-                self._send(self.codec.empacotar(7, ultimo_recebido))
-                continue
 
-            # atualiza o ultimo pacote recebido
-            if confirmacao['tipo'] == 5 or confirmacao['tipo'] == 7:
-                ultimo_recebido = confirmacao['info']
-
-            if ultimo_recebido == total_de_pacotes-1:
-                break
-
-        self.requests_to_send.pop(accept_name)
                 
     def pauseRead(self):
         self.reading = False
