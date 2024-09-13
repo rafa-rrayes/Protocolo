@@ -191,10 +191,13 @@ class Enlace(object):
     def _activate(self):
         import threading
         self.reading = True
+        self.closePort = False
         self.threadRead = threading.Thread(target=self._keep_reading)
         self.threadRead.start()
     def _keep_reading(self):
         while True:
+            if self.closePort:
+                break
             if not self.reading:
                 time.sleep(0.1)
                 continue
@@ -233,13 +236,11 @@ class Enlace(object):
                     self._accepted_goSend(pacote['payload'])
                 elif pacote['tipo'] == 2:
                     if self.accept_all_objects:
-                        self.objects_received[pacote['info']] = pacote['payload']
+                        print(1)
+                        self.objects_received.append(pacote['payload'])
                     if pacote['info'] in self.accepted:
                         self.accepted[pacote['info']] = pacote['payload']
-        
-                self.received.append(pacote)
-
-        
+        return
 
                 
     def pauseRead(self):
@@ -247,8 +248,9 @@ class Enlace(object):
     def resumeRead(self):
         self.reading = True
     def close(self):
-        self.port.close()
+        self.closePort = True
         self.threadRead.join()
+        self.port.close()
     def clear_buffer(self):
         self.buffer = b""
     def get_objects(self):
