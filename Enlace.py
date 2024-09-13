@@ -58,6 +58,7 @@ class Enlace(object):
         self.port.write(pacote)
         if self.keep_log:
             self._log(self.codec.desempacotar(pacote))
+            
 
     def send_object(self, data, request_name=''): # manda uma request para enviar um objeto
         if not self.await_acception_objects:
@@ -77,10 +78,10 @@ class Enlace(object):
                 request = self.codec.empacotar(0, 'object', request_name+'///'+str(type(data))+'///'+str(len(pacote)))
                 self._send(request)
     def send_file(self, file_path,request_name='', save_name=None, data=None): # manda uma request para enviar um arquivo
-        if not data:
+        if data == None:
             with open(file_path, 'rb') as f:
                 data = f.read()
-        if not save_name:
+        if save_name == None:
             save_name = file_path.split('/')[-1]
         pacotes = splice_file(self.codec, data, save_name)
         self.requests_to_send[request_name] = pacotes
@@ -155,12 +156,14 @@ class Enlace(object):
         ultimo_recebido = -1
         while True:
             pacote = pacotes[ultimo_recebido+1]
+            print('Enviando pacote', ultimo_recebido+1)
             self._send(pacote)
             try:
                 confirmacao = self.receive_packet(1)
-            except Timeout:
+            except:
                 self._send(self.codec.empacotar(7, ultimo_recebido))
                 continue
+                
 
             # atualiza o ultimo pacote recebido
             if confirmacao['tipo'] == 5 or confirmacao['tipo'] == 7:
@@ -190,7 +193,10 @@ class Enlace(object):
                 pacote = data[inicio:fim] 
                 data = data[:inicio] + data[fim:]
                 pacote = self.codec.desempacotar(pacote)
+                
                 self._log(pacote, recebido=True)
+                if pacote['crc_recebido'] != pacote['crc_calculado']:
+                    raise InvalidCRC(pacote['crc_recebido'], pacote['crc_calculado'])
                 return pacote
         self.resumeRead()
         raise Timeout
