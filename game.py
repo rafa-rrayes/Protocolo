@@ -65,6 +65,7 @@ def display_message(text, color, x, y):
 com = Enlace.Enlace('/dev/cu.usbmodem1101', accept_all_objects=True, await_acception_objects=False)
 com.open()
 # Game loop
+ultima_pos = 0
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -78,6 +79,7 @@ while running:
             if event.key == pygame.K_d:
                 player1_move_x = player_speed
 
+
         if event.type == pygame.KEYUP:
             if event.key == pygame.K_a or event.key == pygame.K_d:
                 player1_move_x = 0
@@ -85,11 +87,10 @@ while running:
                 player1_move_x = 0
     for posx in com.get_objects():
         player2_x = posx
-    com.send_object(player1_x)
-    # Update player positions
     player1_x += player1_move_x
-
-    # Ensure players stay within screen bounds
+    if player1_x != ultima_pos:
+        com.send_object(player1_x)
+        ultima_pos = player1_x
     player1_x = max(0, min(screen_width - player_width, player1_x))
 
     # Spawn new obstacles at intervals
