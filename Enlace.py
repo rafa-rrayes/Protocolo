@@ -59,7 +59,7 @@ class Enlace(object):
         if self.keep_log:
             self._log(self.codec.desempacotar(pacote))
 
-    def sendData(self, request_name, data): # manda uma request para enviar um objeto
+    def send_object(self, data, request_name=''): # manda uma request para enviar um objeto
         try:
             pacote = self.codec.empacotar(2, request_name, data)
         except Exception as e:
@@ -70,7 +70,7 @@ class Enlace(object):
             self.requests_to_send[request_name] = [pacote]
             request = self.codec.empacotar(0, 'object', request_name+'///'+str(type(data))+'///'+str(len(pacote)))
             self._send(request)
-    def sendFile(self, request_name, file_path, save_name=None, data=None): # manda uma request para enviar um arquivo
+    def send_file(self, file_path,request_name='', save_name=None, data=None): # manda uma request para enviar um arquivo
         if not data:
             with open(file_path, 'rb') as f:
                 data = f.read()
@@ -83,7 +83,6 @@ class Enlace(object):
         else:
             request = self.codec.empacotar(0, 'file', request_name+'///'+save_name+'///'+str(len(pacotes)))
             self._send(request)
-
 
     def accept(self, accept_name):  # aceita uma request para receber um objeto ou arquivo
         if not accept_name in self.requests_to_accept:
@@ -126,7 +125,6 @@ class Enlace(object):
                 if pacote['info'] == ultimo_recebido+1:
                     data += pacote['payload']
                     ultimo_recebido = pacote['info']
-                    print(f"Recebido pacote {ultimo_recebido}")
                     self._send(self.codec.empacotar(5, ultimo_recebido))
                 else:
                     self._error_during_receive(ultimo_recebido)
@@ -208,7 +206,6 @@ class Enlace(object):
                     # If no valid #eNd# marker is found yet, continue reading
                     continue
                 # recebeu um pacote
-                print("Recebeu pacote")
                 fim = fim + self.codec.extremes_size
                 pacote = self.buffer[inicio:fim] 
                 self.buffer = self.buffer[:inicio] + self.buffer[fim:]
@@ -254,6 +251,11 @@ class Enlace(object):
         self.threadRead.join()
     def clear_buffer(self):
         self.buffer = b""
+    def get_objects(self):
+        objects = self.objects_received[:]
+        self.objects_received = []
+
+        return objects
     def _log(self, pacote, recebido=False):
         hora = datetime.now()
         # formated time:
@@ -266,7 +268,6 @@ class Enlace(object):
             linha += " | Enviado | "
 
         if tipo == 0:
-            print(pacote['payload'])
             name = pacote['payload'].split('///')[0]
             linha += f"Request: {name} | {pacote['info']} | "
         elif tipo == 1:
