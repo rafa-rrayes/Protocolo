@@ -134,6 +134,8 @@ class Enlace(object):
             # fim dos dados
             elif pacote['tipo'] == 6: 
                 save_name = pacote['payload']
+                ultimo_recebido = pacote['info']
+                self._send(self.codec.empacotar(5, ultimo_recebido))
                 break
 
             # se der erro, envia confirmação do ultimo pacote recebido
