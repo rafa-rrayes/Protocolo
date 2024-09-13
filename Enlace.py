@@ -44,42 +44,6 @@ class Enlace(object):
         self.codec = Codec()
 
         self.accepted = {}
-    def connect(self, timeout=1):
-        for i in range(3):  # Try 3 times to establish the connection
-            if 'connect' not in self.objects_received:
-                print("Sending connection request")
-                self.send_object('start?', 'connect')
-
-                try:
-                    # Try to receive a response to the connection request within the given timeout
-                    confirmation = self.receive_packet(timeout)
-                except Timeout:
-                    print("Connection attempt timed out, retrying...")
-                    continue  # Timeout, retry
-
-                # Check if we received the expected confirmation
-                if confirmation['tipo'] == 2 and confirmation['info'] == 'connect' and confirmation['payload'] == 'accept':
-                    self.send_object('go', 'connect')
-                    return True  # Connection successfully established
-
-            else:
-                # If 'connect' already exists in the received objects, we're acknowledging the connection
-                print("Sending connection acceptance")
-                self.send_object('accept', 'connect')
-
-                try:
-                    # Wait for the final confirmation from the other server
-                    confirmation = self.receive_packet(timeout)
-                except Timeout:
-                    print("Timeout waiting for 'go' confirmation, retrying...")
-                    continue  # Retry if timeout
-
-                # Check if the confirmation message completes the connection handshake
-                if confirmation['tipo'] == 2 and confirmation['info'] == 'connect' and confirmation['payload'] == 'go':
-                    return True  # Connection successfully established
-
-        # If we've tried 3 times and still failed, return False
-        return False
     def open(self):
         self.port = serial.Serial(self.name,
                                   115200,

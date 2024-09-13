@@ -1,6 +1,6 @@
 import Enlace
 
-com = Enlace.Enlace('/dev/cu.usbmodem1101')
+com = Enlace.Enlace('/dev/cu.usbmodem1101', accept_all_objects=True, await_acception_objects=False)
 com.open()
-com.activate()
-com.sendFile('file', 'audio.mp3')
+com.send_file('audio.mp3', 'file')
+com.close()
