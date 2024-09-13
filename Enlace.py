@@ -60,16 +60,23 @@ class Enlace(object):
             self._log(self.codec.desempacotar(pacote))
 
     def send_object(self, data, request_name=''): # manda uma request para enviar um objeto
-        try:
-            pacote = self.codec.empacotar(2, request_name, data)
-        except Exception as e:
-            raise e
         if not self.await_acception_objects:
+            try:
+                pacote = self.codec.empacotar(2, request_name, data)
+            except Exception as e:
+                raise e
+            print('enviou')
             self._send(pacote)
-        else:
-            self.requests_to_send[request_name] = [pacote]
-            request = self.codec.empacotar(0, 'object', request_name+'///'+str(type(data))+'///'+str(len(pacote)))
-            self._send(request)
+            return
+        else:  
+            try:
+                pacote = self.codec.empacotar(2, request_name, data)
+            except Exception as e:
+                raise e
+            else:
+                self.requests_to_send[request_name] = [pacote]
+                request = self.codec.empacotar(0, 'object', request_name+'///'+str(type(data))+'///'+str(len(pacote)))
+                self._send(request)
     def send_file(self, file_path,request_name='', save_name=None, data=None): # manda uma request para enviar um arquivo
         if not data:
             with open(file_path, 'rb') as f:
