@@ -22,7 +22,7 @@ def splice_file(codec, file_data, save_name, packet_size=255, ):
         inicio = i*packet_size
         fim = inicio + packet_size
         pacotes.append(codec.empacotar(4, i+1, file_data[inicio:fim]))
-    pacotes.append(codec.empacotar(6, 'nome', save_name))
+    pacotes.append(codec.empacotar(6, i+2, save_name))
     return pacotes
 class Enlace(object):
     def __init__(self, name, packet_size=1024, **kwargs):
@@ -52,8 +52,13 @@ class Enlace(object):
                                   0.1)
         
         self._activate()
-    
-    def sendData(self, request_name, data):
+    def _send(self, pacote): # envia um pacote
+        self.port.flush()
+        self.port.write(pacote)
+        if self.keep_log:
+            self._log(self.codec.desempacotar(pacote))
+
+    def sendData(self, request_name, data): # manda uma request para enviar um objeto
         try:
             pacote = self.codec.empacotar(2, request_name, data)
         except Exception as e:
@@ -64,7 +69,7 @@ class Enlace(object):
             self.requests_to_send[request_name] = [pacote]
             request = self.codec.empacotar(0, 'object', request_name+'///'+str(type(data))+'///'+str(len(pacote)))
             self._send(request)
-    def sendFile(self, request_name, file_path, save_name=None, data=None):
+    def sendFile(self, request_name, file_path, save_name=None, data=None): # manda uma request para enviar um arquivo
         if not data:
             with open(file_path, 'rb') as f:
                 data = f.read()
@@ -78,16 +83,18 @@ class Enlace(object):
             self.requests_to_send[request_name] = pacotes
             request = self.codec.empacotar(0, 'file', request_name+'///'+save_name+'///'+str(len(pacotes)))
             self._send(request)
-    def accept(self, accept_name):
+
+
+    def accept(self, accept_name):  # aceita uma request para receber um objeto ou arquivo
         if not accept_name in self.requests_to_accept:
             raise Exception(f"No request to accept with name {accept_name}")
         if self.requests_to_accept[accept_name]['type'] == 'object':
-            return self._acceptObject(accept_name)
+            return self._receive_object(accept_name)
         elif self.requests_to_accept[accept_name]['type'] == 'file':
-            return self._acceptFile(accept_name)
+            return self._receive_file(accept_name)
         
 
-    def _acceptObject(self, accept_name):
+    def _receive_object(self, accept_name):
         self.accepted[accept_name] = None
         self._send(self.codec.empacotar(1, 'object', accept_name))
         while self.accepted[accept_name] == None:
@@ -96,8 +103,10 @@ class Enlace(object):
         self.accepted.pop(accept_name)
         self._send(self.codec.empacotar(5, 0))  
         return objeto
-    def _acceptFile(self, accept_name):
-
+    def _error_during_receive(self, next_packet):
+        self._send(self.codec.empacotar(7, next_packet))
+    def _receive_file(self, accept_name): # recebe um arquivo
+        self.pauseRead()
         self._send(self.codec.empacotar(1, 'file', accept_name))
         data = b""
         ultimo_recebido = -1
@@ -105,38 +114,38 @@ class Enlace(object):
             try:
                 pacote = self.receive_packet(1)
             except Timeout:
-                
-                self._send(self.codec.empacotar(7, ultimo_recebido))
+                self._error_during_receive(ultimo_recebido)
                 continue
-            if pacote['tipo'] == 6:
-                save_name = pacote['payload']
-                break
-            elif pacote['tipo'] == 3:
-                print(f"Recebendo inicio")
-                total_de_pacotes = pacote['info']
+
+            if pacote['tipo'] == 3: # inicio de dados
                 self._send(self.codec.empacotar(5, 0))
                 ultimo_recebido = 0
+
+            # recebe um pacote de dados
             elif pacote['tipo'] == 4:
-                print(f"Recebendo pacote {pacote['info']}")
                 if pacote['info'] == ultimo_recebido+1:
                     data += pacote['payload']
                     ultimo_recebido = pacote['info']
                     print(f"Recebido pacote {ultimo_recebido}")
                     self._send(self.codec.empacotar(5, ultimo_recebido))
                 else:
-                    self._send(self.codec.empacotar(7, ultimo_recebido))
+                    self._error_during_receive(ultimo_recebido)
+
+            # fim dos dados
+            elif pacote['tipo'] == 6: 
+                save_name = pacote['payload']
+                break
+
+            # se der erro, envia confirmação do ultimo pacote recebido
             elif pacote['tipo'] == 7:
-                self._send(self.codec.empacotar(5, ultimo_recebido))
+                self._send(self.codec.empacotar(5, ultimo_recebido)) 
+        
         with open(save_name, 'wb') as f:
             f.write(data)
-        
+        self.resumeRead()
     
         
-    def _send(self, pacote):
-        self.port.flush()
-        self.port.write(pacote)
-        if self.keep_log:
-            self._log(self.codec.desempacotar(pacote))
+    
     def receive_packet(self, timeout=1):
         self.pauseRead()
         start = time.time()
@@ -149,11 +158,13 @@ class Enlace(object):
                 if fim == -1:
                     # If no valid #eNd# marker is found yet, continue reading
                     continue
+                
                 self.resumeRead()
                 fim = fim + self.codec.extremes_size 
                 pacote = data[inicio:fim] 
                 data = data[:inicio] + data[fim:]
                 pacote = self.codec.desempacotar(pacote)
+                self._log(pacote, recebido=True)
                 return pacote
         self.resumeRead()
         raise Timeout
@@ -208,27 +219,26 @@ class Enlace(object):
                 self.received.append(pacote)
 
         
-    def _accepted_goSend(self, accept_name):
+    def _accepted_goSend(self, accept_name):  # envia um objeto ou arquivo aceito
         pacotes = self.requests_to_send[accept_name]
         total_de_pacotes = len(pacotes)
         ultimo_recebido = -1
         while True:
             pacote = pacotes[ultimo_recebido+1]
             self._send(pacote)
-            if self.await_confirmation:
-                try:
-                    confirmacao = self.receive_packet(2)
-                except Timeout:
-                    self._send(self.codec.empacotar(7, ultimo_recebido))
-                    continue
-                if confirmacao['tipo'] == 5:
-                    ultimo_recebido = confirmacao['info']
-                if confirmacao['tipo'] == 7:
-                    ultimo_recebido = confirmacao['info']
-            else:
-                ultimo_recebido += 1
+            try:
+                confirmacao = self.receive_packet(1)
+            except Timeout:
+                self._send(self.codec.empacotar(7, ultimo_recebido))
+                continue
+
+            # atualiza o ultimo pacote recebido
+            if confirmacao['tipo'] == 5 or confirmacao['tipo'] == 7:
+                ultimo_recebido = confirmacao['info']
+
             if ultimo_recebido == total_de_pacotes-1:
                 break
+
         self.requests_to_send.pop(accept_name)
                 
     def pauseRead(self):
@@ -247,27 +257,33 @@ class Enlace(object):
         tipo = pacote['tipo']
         linha = hora
         if recebido:
-            linha += " Recebido / "
+            linha += " | Recebido | "
         else:
-            linha += " Enviado / "
+            linha += " | Enviado | "
 
         if tipo == 0:
-            linha += f" Handshake: {pacote['info']} / "
+            print(pacote['payload'])
+            name = pacote['payload'].split('///')[0]
+            linha += f"Request: {name} | {pacote['info']} | "
         elif tipo == 1:
-            linha += f" Handshake confirmation: {pacote['info']} / "
+            name = pacote['payload'].split('///')[0]
+            linha += f"Accept request: {name} | "
+        elif tipo == 2:
+            linha += f"Object: {pacote['info']} | "
         elif tipo == 3:
-            linha += f" Start of data: {pacote['payload']} / numero de pacotes: {pacote['info']} / "
+            linha += f"Start of data: {pacote['payload']} | numero de pacotes: {pacote['info']} | "
         elif tipo == 4:
-            linha += f" Data: {pacote['info']} / "
+            linha += f"Data: {pacote['info']} | "
         elif tipo == 5:
-            linha += f" Data confirmation: {pacote['info']} / "
+            linha += f"Data confirmation: {pacote['info']} | "
         elif tipo == 6:
-            linha += f" #eNd# of data: {pacote['payload']} / "
+            linha += f"End of data: {pacote['payload']} | "
         elif tipo == 7:
-            linha += f" Error message: {pacote['payload']} / "
-        linha += f" Tamanho: {pacote['total_size']} / "
-        linha += f" CRC recebido: {pacote['crc_recebido']} / "
-        linha += f" CRC calculado: {pacote['crc_calculado']}"
+            linha += f" Error message: {pacote['payload']} | "
+        linha += f"Tamanho pacote: {pacote['total_size']} | "
+        linha += f"CRC recebido: {pacote['crc_recebido']} | "
+        linha += f"CRC calculado: {pacote['crc_calculado']} | "
+        linha += f"Packet ID: {pacote['packet_id']}"
         if 'log.txt' not in os.listdir():
             with open('log.txt', 'w') as f:
                 f.write(linha+'\n')

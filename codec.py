@@ -143,7 +143,7 @@ class Codec:
         tipo = header[0]
         tipo_dados = header[1]
         packet_id = int.from_bytes(header[2:4], byteorder='big')
-        crc_recebido = header[4:self.crc_lenght+2]
+        crc_recebido = header[4:4+self.crc_lenght]
         tamanho_payload = int.from_bytes(header[4+self.crc_lenght:4+self.crc_lenght+self.payload_size_length], byteorder='big')
         info = header[4+self.crc_lenght+self.payload_size_length:]
         payload = pacote[self.header_size+self.extremes_size:-self.extremes_size]
