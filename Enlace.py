@@ -45,17 +45,21 @@ class Enlace(object):
 
         self.accepted = {}
     def connect(self, timeout=1):
-        if 'connect' in self.objects_received:
-            self.send_object('accept', 'connect')
-            return True
-        else:
-            self.send_object('start?', 'connect')
-            try:
+        for i in range(3):
+            if not 'connect' in self.objects_received:
+                self.send_object('start?', 'connect')
+                try:
+                    confirmation = self.receive_packet(timeout/3)
+                except Timeout:
+                    continue
+                if confirmation['tipo'] == 2 and confirmation['info'] == 'connect' and confirmation['payload'] == 'accept':
+                    self.send_object('go', 'connect')
+                    return True
+            else:
+                self.send_object('accept', 'connect')
                 confirmation = self.receive_packet(timeout)
-            except Timeout:
-                return False
-            if confirmation['tipo'] == 2 and confirmation['info'] == 'connect' and confirmation['payload'] == 'accept':
-                return True
+                if confirmation['tipo'] == 2 and confirmation['info'] == 'connect' and confirmation['payload'] == 'go':
+                    return True
         return False
     def open(self):
         self.port = serial.Serial(self.name,
