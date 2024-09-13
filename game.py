@@ -37,7 +37,7 @@ player2_move_x = 0
 # Define obstacle properties
 obstacle_width = 50
 obstacle_height = 50
-obstacle_speed = 7
+obstacle_speed = 0
 obstacles = []
 
 # Timer for obstacles
@@ -62,47 +62,35 @@ def draw_obstacle(x, y):
 def display_message(text, color, x, y):
     message = font.render(text, True, color)
     screen.blit(message, [x, y])
-com = Enlace.Enlace('COM4', accept_all_objects=True, await_confirmation_objects=False)
+com = Enlace.Enlace('/dev/cu.usbmodem1101', accept_all_objects=True, await_acception_objects=False)
 com.open()
 # Game loop
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+            com.close()
 
         # Movement input for player 1 (WASD keys)
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_a:
                 player1_move_x = -player_speed
-                com.send_object('Down_a')
             if event.key == pygame.K_d:
-                com.send_object('Down_d')
                 player1_move_x = player_speed
 
         if event.type == pygame.KEYUP:
             if event.key == pygame.K_a or event.key == pygame.K_d:
                 player1_move_x = 0
-                com.send_object('Up_a')
             if event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT:
-                player2_move_x = 0
-                com.send_object('Up_d')
-    for move in com.get_objects():
-        if move == 'Down_a':
-            player2_move_x = -player_speed
-        if move == 'Down_d':
-            player2_move_x = player_speed
-        if move == 'Up_a':
-            player2_move_x = 0
-        if move == 'Up_d':
-            player2_move_x = 0
-
+                player1_move_x = 0
+    for posx in com.get_objects():
+        player2_x = posx
+    com.send_object(player1_x)
     # Update player positions
     player1_x += player1_move_x
-    player2_x += player2_move_x
 
     # Ensure players stay within screen bounds
     player1_x = max(0, min(screen_width - player_width, player1_x))
-    player2_x = max(0, min(screen_width - player_width, player2_x))
 
     # Spawn new obstacles at intervals
     obstacle_timer += 1
