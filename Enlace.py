@@ -99,7 +99,7 @@ class Enlace(object):
         elif self.requests_to_accept[accept_name]['type'] == 'file':
             return self._receive_file(accept_name)
         
-    def _error_during_receive(self, next_packet):
+    def _error_during_receive(self, next_packet, ):
         self._send(self.codec.empacotar(7, next_packet))
     def _receive_object(self, accept_name):
         self.accepted[accept_name] = None
@@ -119,8 +119,8 @@ class Enlace(object):
         while True:
             try:
                 pacote = self.receive_packet(1)
-            except Timeout:
-                self._error_during_receive(ultimo_recebido)
+            except Exception as e:
+                self._error_during_receive(ultimo_recebido, e.message)
                 continue
 
             if pacote['tipo'] == 3: # inicio de dados
@@ -134,7 +134,7 @@ class Enlace(object):
                     ultimo_recebido = pacote['info']
                     self._send(self.codec.empacotar(5, ultimo_recebido))
                 else:
-                    self._error_during_receive(ultimo_recebido)
+                    self._error_during_receive(ultimo_recebido, 'Pacote fora de ordem')
 
             # fim dos dados
             elif pacote['tipo'] == 6: 
@@ -154,14 +154,18 @@ class Enlace(object):
         pacotes = self.requests_to_send[accept_name]
         total_de_pacotes = len(pacotes)
         ultimo_recebido = -1
+        jadeuCRC = False
         while True:
             pacote = pacotes[ultimo_recebido+1]
+            if ultimo_recebido == 40 and jadeuCRC == False:
+                pacote= pacote[:9]+b'\x00\x00'+pacote[11:]
+                jadeuCRC = True
             print('Enviando pacote', ultimo_recebido+1)
             self._send(pacote)
             try:
                 confirmacao = self.receive_packet(1)
-            except:
-                self._send(self.codec.empacotar(7, ultimo_recebido))
+            except Exception as e:
+                self._send(self.codec.empacotar(7, ultimo_recebido, e.message))
                 continue
                 
 

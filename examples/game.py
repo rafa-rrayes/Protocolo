@@ -1,13 +1,13 @@
 import pygame
 import random
 import Enlace
-
+import time
 # Initialize Pygame
 pygame.init()
 
 # Set the width and height of the screen
-screen_width = 800
-screen_height = 600
+screen_width = 1500
+screen_height = 900
 screen = pygame.display.set_mode((screen_width, screen_height))
 
 # Set the title of the window
@@ -20,8 +20,8 @@ red = (255, 0, 0)
 green = (0, 255, 0)
 
 # Define the player size and speed
-player_width = 50
-player_height = 50
+player_width = 100
+player_height = 100
 player_speed = 5
 
 # Define player positions
@@ -64,7 +64,10 @@ def display_message(text, color, x, y):
     screen.blit(message, [x, y])
 com = Enlace.Enlace('/dev/cu.usbmodem1101', accept_all_objects=True, await_acception_objects=False)
 com.open()
-# Game loop
+# if not com.connect(5):
+#     print("Erro ao conectar")
+#     exit()
+# # Game loop
 ultima_pos = 0
 while running:
     for event in pygame.event.get():
@@ -85,7 +88,7 @@ while running:
                 player1_move_x = 0
             if event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT:
                 player1_move_x = 0
-    for posx in com.get_objects():
+    for posx in com.get_objects().values():
         player2_x = posx
     player1_x += player1_move_x
     if player1_x != ultima_pos:
