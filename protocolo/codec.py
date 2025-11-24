@@ -1,21 +1,23 @@
 import binascii
 import pickle
 import math
+
+
 class Codec:
     def __init__(self, **kwargs) -> None:
-        self.crc_lenght = 2 or kwargs.get('crc_lenght')
-        self.crc_hash = 0xFFFF or kwargs.get('crc_hash')
-        self.max_payload = 255 or kwargs.get('max_payload')
-        self.info_size = 9 or kwargs.get('info_size')
+        self.crc_length = kwargs.get('crc_length', 2)
+        self.crc_hash = kwargs.get('crc_hash', 0xFFFF)
+        self.max_payload = kwargs.get('max_payload', 255)
+        self.info_size = kwargs.get('info_size', 9)
         self.payload_size_length = math.ceil(self.max_payload.bit_length()/8) 
-        self.start_sequence = b'#StR#' or kwargs.get('start_sequence')
-        self.end_sequence = b'#eNd#' or kwargs.get('end_sequence')
+        self.start_sequence = kwargs.get('start_sequence', b'#StR#')
+        self.end_sequence = kwargs.get('end_sequence', b'#eNd#')
         self.extremes_size = len(self.start_sequence)
-        self.header_size = self.payload_size_length + self.info_size + self.crc_lenght + 4
+        self.header_size = self.payload_size_length + self.info_size + self.crc_length + 4
         self.header_slice = slice(self.extremes_size, self.extremes_size+self.header_size)
 
-        if type(self.crc_lenght) != int:
-            raise Exception("crc_lenght deve ser um inteiro")
+        if type(self.crc_length) != int:
+            raise Exception("crc_length deve ser um inteiro")
         if type(self.crc_hash) != int:
             raise Exception("crc_hash deve ser um inteiro")
         if type(self.max_payload) != int:
@@ -34,7 +36,7 @@ class Codec:
         self.packet_id = 0
     def crc16(self, data: bytes):
         crc16 = binascii.crc_hqx(data, self.crc_hash)
-        crc16 = crc16.to_bytes(self.crc_lenght, 'big')
+        crc16 = crc16.to_bytes(self.crc_length, 'big')
         return crc16
     def empacotar(self, tipo:int, info=None, payload=None):
         """
@@ -143,9 +145,9 @@ class Codec:
         tipo = header[0]
         tipo_dados = header[1]
         packet_id = int.from_bytes(header[2:4], byteorder='big')
-        crc_recebido = header[4:4+self.crc_lenght]
-        tamanho_payload = int.from_bytes(header[4+self.crc_lenght:4+self.crc_lenght+self.payload_size_length], byteorder='big')
-        info = header[4+self.crc_lenght+self.payload_size_length:]
+        crc_recebido = header[4:4+self.crc_length]
+        tamanho_payload = int.from_bytes(header[4+self.crc_length:4+self.crc_length+self.payload_size_length], byteorder='big')
+        info = header[4+self.crc_length+self.payload_size_length:]
         payload = pacote[self.header_size+self.extremes_size:-self.extremes_size]
         
 

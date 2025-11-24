@@ -30,8 +30,8 @@ class Enlace(object):
         self.packet_size = packet_size
         self.accept_all_files = kwargs.get('accept_all_files', False)
         self.accept_all_objects = kwargs.get('accept_all_objects', True)
-        self.await_acception_objects =kwargs.get('await_acception_objects', True)
-        self.await_acception_files =kwargs.get('await_acception_files', True)
+        self.await_acceptance_objects =kwargs.get('await_acceptance_objects', True)
+        self.await_acceptance_files =kwargs.get('await_acceptance_files', True)
         self.send_confirmation =kwargs.get('send_confirmation', True)
         self.keep_log = kwargs.get('keep_log', True)
         self.requests_to_accept = {}
@@ -61,7 +61,7 @@ class Enlace(object):
             
 
     def send_object(self, data, request_name=''): # manda uma request para enviar um objeto
-        if not self.await_acception_objects:
+        if not self.await_acceptance_objects:
             try:
                 pacote = self.codec.empacotar(2, request_name, data)
             except Exception as e:
@@ -85,7 +85,7 @@ class Enlace(object):
             save_name = file_path.split('/')[-1]
         pacotes = splice_file(self.codec, data, save_name)
         self.requests_to_send[request_name] = pacotes
-        if not self.await_acception_files:
+        if not self.await_acceptance_files:
             self._accepted_goSend(request_name)
         else:
             request = self.codec.empacotar(0, 'file', request_name+'///'+save_name+'///'+str(len(pacotes)))
@@ -154,13 +154,8 @@ class Enlace(object):
         pacotes = self.requests_to_send[accept_name]
         total_de_pacotes = len(pacotes)
         ultimo_recebido = -1
-        jadeuCRC = False
         while True:
             pacote = pacotes[ultimo_recebido+1]
-            if ultimo_recebido == 40 and jadeuCRC == False:
-                pacote= pacote[:9]+b'\x00\x00'+pacote[11:]
-                jadeuCRC = True
-            print('Enviando pacote', ultimo_recebido+1)
             self._send(pacote)
             try:
                 confirmacao = self.receive_packet(1)
