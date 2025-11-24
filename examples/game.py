@@ -1,6 +1,6 @@
 import pygame
 import random
-import Enlace
+from protocolo import Enlace
 import time
 # Initialize Pygame
 pygame.init()
@@ -62,7 +62,7 @@ def draw_obstacle(x, y):
 def display_message(text, color, x, y):
     message = font.render(text, True, color)
     screen.blit(message, [x, y])
-com = Enlace.Enlace('/dev/cu.usbmodem1101', accept_all_objects=True, await_acception_objects=False)
+com = Enlace('/dev/cu.usbmodem1101', accept_all_objects=True, await_acception_objects=False)
 com.open()
 # if not com.connect(5):
 #     print("Erro ao conectar")

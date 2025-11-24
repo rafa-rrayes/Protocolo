@@ -1,6 +1,6 @@
 import serial
 import time
-from codec import Codec
+from .codec import Codec
 from datetime import datetime
 import os
 import math
