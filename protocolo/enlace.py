@@ -30,9 +30,9 @@ class Enlace(object):
         self.packet_size = packet_size
         self.accept_all_files = kwargs.get('accept_all_files', False)
         self.accept_all_objects = kwargs.get('accept_all_objects', True)
-        self.await_acceptance_objects =kwargs.get('await_acceptance_objects', True)
-        self.await_acceptance_files =kwargs.get('await_acceptance_files', True)
-        self.send_confirmation =kwargs.get('send_confirmation', True)
+        self.await_acceptance_objects = kwargs.get('await_acceptance_objects', True)
+        self.await_acceptance_files = kwargs.get('await_acceptance_files', True)
+        self.send_confirmation = kwargs.get('send_confirmation', True)
         self.keep_log = kwargs.get('keep_log', True)
         self.requests_to_accept = {}
         self.requests_to_send = {}
@@ -226,9 +226,6 @@ class Enlace(object):
                 
                 pacote = self.codec.desempacotar(pacote)
                 self._log(pacote, recebido=True)
-
-                # if pacote['crc_recebido'] != pacote['crc_calculado']:
-                #     raise InvalidCRC(pacote['crc_recebido'], pacote['crc_calculado'])
 
                 if pacote['tipo'] == 0:
                     request_type = pacote['info']
